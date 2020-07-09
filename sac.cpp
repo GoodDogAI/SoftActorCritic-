@@ -1,4 +1,5 @@
 #include "sac.h"
+#include "normal.h"
 
 template<class Inner>
 SquashedGaussianMLPActor<Inner>::SquashedGaussianMLPActor(std::shared_ptr<Inner> inner, int actionDim, float actionLimit)
@@ -19,11 +20,11 @@ torch::Tensor SquashedGaussianMLPActor<Inner>::forward(torch::Tensor input, bool
     Tensor mu = this->mu->forward(innerOut);
     Tensor logStd = clamp(this->logStd->forward(innerOut), LOG_STD_MIN, LOG_STD_MAX);
     Tensor std = exp(logStd);
-    auto pi_distribution = torch::distributions normal(mu, std);
+    auto pi_distribution = Normal(mu, std);
     Tensor pi_action = deterministic ? mu : pi_distribution.rsample();
     if (logProb) {
-        logProb = pi_distribution.log_prob(pi_action).sum(axis=-1);
-        logProb -= (2 * (log(2f) - pi_action - softplus(-2 * pi_action))).sum(axis = 1)
+        logProb = pi_distribution.logProb(pi_action).sum(-1);
+        logProb -= (2 * (log(2f) - pi_action - softplus(-2 * pi_action))).sum(1);
     }
     pi_action = tanh(pi_action);
     pi_action = this.actionLimit * pi_action;
